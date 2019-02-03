@@ -1,3 +1,7 @@
-logging:
-  level:
-    br: TRACE
+server:
+          servlet:
+            context-path: /api
+
+          logging:
+            level:
+              br: TRACE

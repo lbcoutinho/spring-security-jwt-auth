@@ -2,12 +2,10 @@ package br.com.lbcoutinho.auth.security.config;
 
 import br.com.lbcoutinho.auth.security.filter.JWTAuthenticationFilter;
 import br.com.lbcoutinho.auth.security.filter.JWTAuthorizationFilter;
-import br.com.lbcoutinho.auth.security.handler.JWTAuthenticationHandler;
-import br.com.lbcoutinho.auth.security.service.UserServiceAuthenticationProvider;
+import br.com.lbcoutinho.auth.security.service.UserAuthenticationProvider;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpMethod;
@@ -19,15 +17,16 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.provisioning.InMemoryUserDetailsManager;
-import org.springframework.web.cors.CorsConfiguration;
-import org.springframework.web.cors.CorsConfigurationSource;
-import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+
+import static br.com.lbcoutinho.auth.model.Authority.ADMIN;
+import static br.com.lbcoutinho.auth.security.util.SecurityConstants.ENCODED_PASSWORD_12345;
 
 @EnableWebSecurity
-public class WebSecurityConfig extends WebSecurityConfigurerAdapter {
+public class WebSecurityConfig {
 
     /**
-     * Routes starting with /app are authenticated with Basic Authentication
+     * Routes containing /basic are authenticated with Basic Authentication.
      */
     @Configuration
     @Order(1)
@@ -38,7 +37,7 @@ public class WebSecurityConfig extends WebSecurityConfigurerAdapter {
         protected void configure(HttpSecurity http) throws Exception {
             log.trace("BasicWebSecurityConfig.configure(HttpSecurity)");
             http
-                    .antMatcher("/app/**")
+                    .antMatcher("/basic/**")
                     .authorizeRequests()
                     .anyRequest().authenticated()
                     .and()
@@ -53,27 +52,27 @@ public class WebSecurityConfig extends WebSecurityConfigurerAdapter {
         @Override
         protected UserDetailsService userDetailsService() {
             InMemoryUserDetailsManager manager = new InMemoryUserDetailsManager();
-            manager.createUser(User.withUsername("admin").password("$2a$10$Fiz8ZUjSvlZpgATT2TZpsOkXaLS.9IUrplcQUlMqw49dsv/MUXhDq").roles("ADMIN").build());
+            manager.createUser(User.withUsername("user1").password(ENCODED_PASSWORD_12345).roles("USER").build());
             return manager;
         }
     }
 
     /**
-     * Routes /login and any other are handled by this configuration
+     * Any other route (including /login) is handled by this configuration and authenticated with Bearer Authentication.<br>
+     * /login route is not going to require Bearer Authentication because the {@link JWTAuthenticationFilter} is setup before the {@link JWTAuthorizationFilter}.<br>
+     * {@link JWTAuthenticationFilter} is going to capture the /login requests, block the Security Chain from proceeding and authenticate the user.
      */
     @Configuration
-    @Slf4j
     @Order(2)
+    @Slf4j
     static class JWTWebSecurityConfig extends WebSecurityConfigurerAdapter {
 
-        private UserServiceAuthenticationProvider userServiceAuthenticationProvider;
-        private JWTAuthenticationHandler jwtAuthenticationHandler;
+        private UserAuthenticationProvider userAuthenticationProvider;
         private ObjectMapper objectMapper;
 
         @Autowired
-        public JWTWebSecurityConfig(UserServiceAuthenticationProvider userServiceAuthenticationProvider, JWTAuthenticationHandler jwtAuthenticationHandler, ObjectMapper objectMapper) {
-            this.userServiceAuthenticationProvider = userServiceAuthenticationProvider;
-            this.jwtAuthenticationHandler = jwtAuthenticationHandler;
+        public JWTWebSecurityConfig(UserAuthenticationProvider userAuthenticationProvider, ObjectMapper objectMapper) {
+            this.userAuthenticationProvider = userAuthenticationProvider;
             this.objectMapper = objectMapper;
         }
 
@@ -81,52 +80,41 @@ public class WebSecurityConfig extends WebSecurityConfigurerAdapter {
         protected void configure(HttpSecurity http) throws Exception {
             log.trace("JWTWebSecurityConfig.configure(HttpSecurity)");
             http
-                    // Enable CORS - by default uses a Bean by the name of corsConfigurationSource
-                    .cors().and()
                     // Disable CSRF
                     .csrf().disable()
                     .authorizeRequests()
                     // Permit POST to /login
-                    .antMatchers(HttpMethod.POST, "/login").permitAll() // TODO define /login route on config file and reuse
-                    // Any other request must be authorized using JWT
+                    .antMatchers(HttpMethod.POST, "/login").permitAll()
+                    // Any routes containing /admin are going to require ADMIN authority
+                    .antMatchers("/admin/**").hasAuthority(ADMIN.getAuthority())
+                    // Any request will require authentication.
+                    // /login route is not going to require authentication because it's setup with permitAll
                     .anyRequest().authenticated()
                     .and()
+                    // Filter that captures the /login requests
                     .addFilter(jwtAuthenticationFilter())
-                    .addFilter(jwtAuthorizationFilter())
+                    // Filter responsible for validating the JWT token and setting the SecurityContext to indicate that the user is authenticated
+                    .addFilterAfter(jwtAuthorizationFilter(), UsernamePasswordAuthenticationFilter.class)
                     // Disables session creation of Spring Security
                     .sessionManagement().sessionCreationPolicy(SessionCreationPolicy.STATELESS);
         }
 
         /**
-         * Configure {@link AuthenticationManagerBuilder} to use the {@link UserServiceAuthenticationProvider} to authenticate the users.
+         * Configure {@link AuthenticationManagerBuilder} to use the {@link UserAuthenticationProvider} to authenticate the users.
          */
         @Override
         protected void configure(AuthenticationManagerBuilder auth) {
             log.trace("JWTWebSecurityConfig.configure(AuthenticationManagerBuilder)");
-            auth.authenticationProvider(userServiceAuthenticationProvider);
+            auth.authenticationProvider(userAuthenticationProvider);
         }
 
         private JWTAuthenticationFilter jwtAuthenticationFilter() throws Exception {
-            return new JWTAuthenticationFilter(authenticationManager(), jwtAuthenticationHandler, objectMapper);
+            return new JWTAuthenticationFilter(authenticationManager(), objectMapper);
         }
 
-        private JWTAuthorizationFilter jwtAuthorizationFilter() throws Exception {
-            return new JWTAuthorizationFilter(authenticationManager(), objectMapper);
+        private JWTAuthorizationFilter jwtAuthorizationFilter() {
+            return new JWTAuthorizationFilter(objectMapper);
         }
-    }
-
-    /**
-     * Allow/restrict CORS support. <br>
-     * "/**" permits request from any source.
-     */
-    @Bean
-    CorsConfigurationSource corsConfigurationSource() {
-        CorsConfiguration config = new CorsConfiguration();
-        config.applyPermitDefaultValues();
-
-        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/**", config);
-        return source;
     }
 
 }
