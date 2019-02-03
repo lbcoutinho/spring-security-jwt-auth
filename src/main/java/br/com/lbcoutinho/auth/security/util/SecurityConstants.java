@@ -5,6 +5,7 @@ public final class SecurityConstants {
     public static final long EXPIRATION_TIME = 24 * 60 * 60 * 1000; // 30 days
     public static final String JWT_SECRET = "124v7n891v47n891v89fy89h1";
     public static final String BEARER_PREFIX = "Bearer ";
+    public static final String BASIC_PREFIX = "Basic ";
 
     public static final String NAME = "name";
     public static final String EMAIL = "email";

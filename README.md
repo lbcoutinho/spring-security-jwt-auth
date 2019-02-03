@@ -33,3 +33,25 @@ mvnw spring-boot:run
   * Custom authentication provider
 * JWT generation and validation
 * Code generation with Lombok
+* Testing
+  * Spring and JUnit 5 integration
+  * JUnit 5 assertions
+  * Parameterized tests
+  * Mocking with Mockito
+  * Assertions with AssertJ
+  
+## Recommendations
+* Multiple Entry Points in Spring Security
+https://www.baeldung.com/spring-security-multiple-entry-points
+
+* Architecture Deep Dive in Spring Security - Joe Grandja @ Spring I/O 2017
+https://www.youtube.com/watch?v=8rnOsF3RVQc
+
+* Spring Security Reference
+https://docs.spring.io/spring-security/site/docs/5.2.0.BUILD-SNAPSHOT/reference/htmlsingle/
+
+* Unit and Integration Tests for RestControllers in Spring Boot
+https://thepracticaldeveloper.com/2017/07/31/guide-spring-boot-controller-tests/
+
+* JUnit 5 – Parameterized Tests
+https://blog.codefx.org/libraries/junit-5-parameterized-tests/

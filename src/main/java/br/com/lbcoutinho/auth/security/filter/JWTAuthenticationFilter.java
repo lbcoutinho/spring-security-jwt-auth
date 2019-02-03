@@ -92,6 +92,7 @@ public class JWTAuthenticationFilter extends UsernamePasswordAuthenticationFilte
         log.debug("Generating JWT token for user {}", user.getLogin());
 
         // Create JWT token
+        long now = System.currentTimeMillis();
         String[] authorities = user.getAuthorities().stream().map(Authority::toString).toArray(String[]::new);
         String token = JWT.create()
                 .withSubject(user.getLogin())
@@ -99,7 +100,8 @@ public class JWTAuthenticationFilter extends UsernamePasswordAuthenticationFilte
                 .withClaim(EMAIL, user.getEmail())
                 .withClaim(PHONE, user.getPhone())
                 .withArrayClaim(AUTHORITIES, authorities)
-                .withExpiresAt(new Date(System.currentTimeMillis() + EXPIRATION_TIME))
+                .withExpiresAt(new Date(now + EXPIRATION_TIME))
+                .withIssuedAt(new Date(now))
                 .sign(Algorithm.HMAC512(JWT_SECRET));
 
         // Set token on response header

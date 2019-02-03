@@ -74,13 +74,11 @@ public class JWTAuthorizationFilter extends OncePerRequestFilter {
 
             } catch (JWTVerificationException e) {
                 log.debug("{}: {}", e.getClass().getSimpleName(), e.getMessage());
-                String msg;
+                String msg = e.getMessage();
                 if (e instanceof TokenExpiredException) {
                     msg = "JWT expired";
                 } else if (e instanceof JWTDecodeException) {
                     msg = "Invalid JWT";
-                } else {
-                    msg = e.getMessage();
                 }
 
                 onUnsuccessfulAuthentication(response, new JWTValidationException(msg));
